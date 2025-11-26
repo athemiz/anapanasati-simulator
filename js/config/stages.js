@@ -27,10 +27,10 @@ export const STAGES = [
         category: "Samatha: Anapanasati",
         title: "2. Following",
         pali: "Anubandhana",
-        desc: "Drop the counting. Follow the continuous flow of breath at the touching point. The noise subsides.",
+        desc: "Drop the counting. Follow the continuous flow of breath. The visual noise begins to transform - hints of grey smokiness emerge within the field.",
         factors: ['f-vitakka', 'f-vicara'], // Applied + Sustained
         mode: 'SAMATHA_BREATH',
-        params: { noise: 0.3, focus: 0.4, nimittaStr: 0.0, nimittaType: 'none', breathVis: 0.8 },
+        params: { noise: 0.6, focus: 0.4, greyEmergence: 0.4, nimittaStr: 0.0, nimittaType: 'none', breathVis: 0.8 },
         durationMinutes: 35 // Deepening concentration
     },
     {
@@ -38,10 +38,10 @@ export const STAGES = [
         category: "Samatha: Nimitta",
         title: "3. Preparatory Sign",
         pali: "Parikamma-Nimitta",
-        desc: "A grey, smoky, or misty form appears diffusely across the visual field. It is unstable and wanders. Do not chase it; keep focus on the breath.",
+        desc: "White misty clouds form across the visual field with shiny spots. They are unstable and wander. Do not chase them; keep focus on the breath.",
         factors: ['f-vitakka', 'f-vicara'],
         mode: 'SAMATHA_NIMITTA',
-        params: { noise: 0.15, focus: 0.6, nimittaStr: 0.4, nimittaType: 'clouds', breathVis: 0.6 },
+        params: { noise: 0.5, focus: 0.6, greyEmergence: 0.7, nimittaStr: 0.5, nimittaType: 'clouds', breathVis: 0.6 },
         durationMinutes: 25 // Sign appears and develops
     },
     {
@@ -49,10 +49,10 @@ export const STAGES = [
         category: "Samatha: Nimitta",
         title: "4. Learning Sign",
         pali: "Uggaha-Nimitta",
-        desc: "The sign solidifies. It becomes white and opaque (like cotton, plaster, or a pearl). It is stable.",
+        desc: "The clouds coalesce into a white, opaque form (like cotton or a pearl). It becomes stable and defined.",
         factors: ['f-vitakka', 'f-vicara', 'f-piti'], // Joy arises
         mode: 'SAMATHA_NIMITTA',
-        params: { noise: 0.00, focus: 0.8, nimittaStr: 0.9, nimittaType: 'cotton', breathVis: 0.4 },
+        params: { noise: 0.2, focus: 0.8, greyEmergence: 0.5, nimittaStr: 0.85, nimittaType: 'cotton', breathVis: 0.4 },
         durationMinutes: 30 // Stabilizing the sign
     },
     {
@@ -60,10 +60,10 @@ export const STAGES = [
         category: "Samatha: Nimitta",
         title: "5. Counterpart Sign",
         pali: "Patibhaga-Nimitta",
-        desc: "The texture falls away. The sign becomes transparent, radiant, and brilliant (like the morning star or crystal).",
+        desc: "The opacity falls away. The sign becomes transparent, radiant, and brilliant (like the morning star or crystal).",
         factors: ['f-vitakka', 'f-vicara', 'f-piti', 'f-sukha', 'f-ekaggata'], // All 5 factors
         mode: 'SAMATHA_NIMITTA',
-        params: { noise: 0.00, focus: 1.0, nimittaStr: 1.0, nimittaType: 'crystal', breathVis: 0.1 },
+        params: { noise: 0.0, focus: 1.0, greyEmergence: 0.2, nimittaStr: 1.0, nimittaType: 'crystal', breathVis: 0.1 },
         durationMinutes: 25 // Approaching absorption
     },
     
