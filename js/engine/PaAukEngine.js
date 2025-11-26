@@ -173,16 +173,9 @@ export class PaAukEngine {
 
         // Handle non-numeric params (switch at appropriate time)
         if (prevParams.nimittaType || nextParams.nimittaType) {
-            // Gradual nimitta type transition
-            if (t < 0.3) {
-                blended.nimittaType = prevParams.nimittaType;
-            } else if (t > 0.7) {
-                blended.nimittaType = nextParams.nimittaType;
-            } else {
-                // During middle transition, blend by fading
-                blended.nimittaType = nextParams.nimittaType;
-                blended.nimittaTransition = (t - 0.3) / 0.4; // 0-1 during transition
-            }
+            // Gradual nimitta type transition - switch at midpoint
+            // The smooth transition happens via nimittaStr interpolation
+            blended.nimittaType = t < 0.5 ? (prevParams.nimittaType || 'clouds') : (nextParams.nimittaType || 'clouds');
         }
 
         if (prevParams.subType || nextParams.subType) {
@@ -391,48 +384,110 @@ export class PaAukEngine {
         }
     }
 
-    // --- RENDERER 1: BREATH & CHAOS ---
+    // --- RENDERER 1: BREATH & VISUAL FIELD NOISE ---
     renderBreath(p) {
         const breath = Math.sin(this.state.breathPhase);
         const noise = p.noise !== undefined ? p.noise : 0.3;
         
-        this.ctx.fillStyle = 'rgba(150, 200, 255, 0.4)';
-
-        for(let i=0; i<1000; i++) {
-            let pt = this.particles[i];
-
-            // Blend between chaos and flow based on noise level
-            const chaosAmount = Math.min(1, noise * 3);
-            const flowAmount = 1 - chaosAmount;
-
-            // Chaos movement
-            if (chaosAmount > 0) {
-                pt.x += (Math.random()-0.5) * 4 * chaosAmount;
-                pt.y += (Math.random()-0.5) * 4 * chaosAmount;
-            }
-
-            // Flow movement
-            if (flowAmount > 0) {
-                const dx = pt.x - this.cx;
-                const dy = pt.y - this.cy;
-                const dist = Math.sqrt(dx*dx + dy*dy);
-
-                if(dist < 300) {
-                    const force = (breath > 0 ? 1 : -0.5) * 2 * flowAmount;
-                    pt.x -= (dx/dist) * force;
-                    pt.y -= (dy/dist) * force;
+        // Create visual field noise - like TV static mixed with colored smokiness
+        // This represents the "noise" of an unfocused mind
+        
+        const imageData = this.ctx.getImageData(0, 0, this.width, this.height);
+        const data = imageData.data;
+        
+        // Generate noise pattern
+        const time = this.state.time;
+        
+        for (let y = 0; y < this.height; y += 2) {
+            for (let x = 0; x < this.width; x += 2) {
+                const i = (y * this.width + x) * 4;
+                
+                // Multi-layered noise for organic feel
+                const n1 = Math.random();
+                const n2 = Math.sin(x * 0.01 + time) * Math.cos(y * 0.01 + time * 0.7);
+                const n3 = Math.sin((x + y) * 0.005 + time * 0.3);
+                
+                // Combine noise layers
+                const noiseVal = (n1 * 0.6 + n2 * 0.2 + n3 * 0.2);
+                
+                // Color variations - purples, blues, grays, occasional warm tones
+                // This mimics phosphenes and visual field noise
+                const colorShift = Math.random();
+                let r, g, b;
+                
+                if (colorShift < 0.4) {
+                    // Dark grays/blacks
+                    const gray = noiseVal * 30 * noise;
+                    r = gray;
+                    g = gray;
+                    b = gray;
+                } else if (colorShift < 0.6) {
+                    // Purplish tones
+                    r = noiseVal * 25 * noise;
+                    g = noiseVal * 10 * noise;
+                    b = noiseVal * 35 * noise;
+                } else if (colorShift < 0.8) {
+                    // Bluish tones
+                    r = noiseVal * 15 * noise;
+                    g = noiseVal * 20 * noise;
+                    b = noiseVal * 40 * noise;
+                } else {
+                    // Occasional warm spots
+                    r = noiseVal * 35 * noise;
+                    g = noiseVal * 20 * noise;
+                    b = noiseVal * 10 * noise;
                 }
-                pt.x += (Math.random()-0.5) * flowAmount;
-                pt.y += (Math.random()-0.5) * flowAmount;
+                
+                // Apply to pixel and neighbors (2x2 block for performance)
+                for (let dy = 0; dy < 2 && y + dy < this.height; dy++) {
+                    for (let dx = 0; dx < 2 && x + dx < this.width; dx++) {
+                        const idx = ((y + dy) * this.width + (x + dx)) * 4;
+                        data[idx] = Math.min(255, data[idx] + r);
+                        data[idx + 1] = Math.min(255, data[idx + 1] + g);
+                        data[idx + 2] = Math.min(255, data[idx + 2] + b);
+                    }
+                }
             }
-
-            // Bounds
-            if(pt.x < 0) pt.x = this.width;
-            if(pt.x > this.width) pt.x = 0;
-            if(pt.y < 0) pt.y = this.height;
-            if(pt.y > this.height) pt.y = 0;
-
-            this.ctx.fillRect(pt.x - this.cx, pt.y - this.cy, 1.5, 1.5);
+        }
+        
+        this.ctx.putImageData(imageData, 0, 0);
+        
+        // Add smoky wisps that drift slowly (not particles, but gradients)
+        const numWisps = Math.floor(5 + noise * 10);
+        for (let w = 0; w < numWisps; w++) {
+            // Each wisp has a slowly changing position
+            const wispX = Math.sin(time * 0.1 + w * 2.5) * this.width * 0.4;
+            const wispY = Math.cos(time * 0.08 + w * 1.8) * this.height * 0.4;
+            const wispSize = 100 + Math.sin(time * 0.2 + w) * 50;
+            
+            const grad = this.ctx.createRadialGradient(wispX, wispY, 0, wispX, wispY, wispSize);
+            const alpha = noise * 0.15;
+            
+            // Vary wisp colors
+            if (w % 3 === 0) {
+                grad.addColorStop(0, `rgba(60, 50, 80, ${alpha})`);
+            } else if (w % 3 === 1) {
+                grad.addColorStop(0, `rgba(40, 50, 70, ${alpha})`);
+            } else {
+                grad.addColorStop(0, `rgba(50, 45, 55, ${alpha})`);
+            }
+            grad.addColorStop(1, 'rgba(0,0,0,0)');
+            
+            this.ctx.fillStyle = grad;
+            this.ctx.fillRect(-this.cx, -this.cy, this.width, this.height);
+        }
+        
+        // Subtle breath-synchronized field pulsation (not particles)
+        // The whole field very gently brightens/darkens with breath
+        const breathAlpha = (breath + 1) * 0.02 * (1 - noise); // More visible as noise decreases
+        if (breathAlpha > 0.005) {
+            const breathGrad = this.ctx.createRadialGradient(0, 0, 0, 0, 0, 300);
+            breathGrad.addColorStop(0, `rgba(100, 120, 150, ${breathAlpha})`);
+            breathGrad.addColorStop(1, 'rgba(0,0,0,0)');
+            this.ctx.fillStyle = breathGrad;
+            this.ctx.beginPath();
+            this.ctx.arc(0, 0, 300, 0, Math.PI * 2);
+            this.ctx.fill();
         }
     }
 
@@ -440,64 +495,132 @@ export class PaAukEngine {
     renderNimitta(p) {
         const noise = p.noise !== undefined ? p.noise : 0;
         const nimittaStr = p.nimittaStr !== undefined ? p.nimittaStr : 0;
-        const nimittaType = p.nimittaType || 'smoke';
+        const nimittaType = p.nimittaType || 'clouds';
+        const time = this.state.time;
 
-        // Background noise particles
-        if(noise > 0) {
-            this.ctx.fillStyle = `rgba(255,255,255,${noise})`;
-            for(let i=0; i<200; i++) {
-                const pt = this.particles[i];
-                this.ctx.fillRect(pt.x-this.cx, pt.y-this.cy, 1, 1);
+        // Background visual noise (reduced from breath stage)
+        if (noise > 0) {
+            // Subtle TV-static like noise
+            const imageData = this.ctx.getImageData(0, 0, this.width, this.height);
+            const data = imageData.data;
+            
+            for (let y = 0; y < this.height; y += 3) {
+                for (let x = 0; x < this.width; x += 3) {
+                    if (Math.random() > 0.7) continue;
+                    const i = (y * this.width + x) * 4;
+                    const n = Math.random() * 20 * noise;
+                    data[i] = Math.min(255, data[i] + n);
+                    data[i + 1] = Math.min(255, data[i + 1] + n);
+                    data[i + 2] = Math.min(255, data[i + 2] + n * 1.2);
+                }
             }
+            this.ctx.putImageData(imageData, 0, 0);
         }
 
-        if(nimittaStr <= 0) return;
+        if (nimittaStr <= 0) return;
 
-        const size = 150;
-
-        // Render based on nimitta type with smooth strength
-        if (nimittaType === 'smoke') {
-            const wobbleX = Math.sin(this.state.time) * 30 * (1 - nimittaStr * 0.5);
-            const wobbleY = Math.cos(this.state.time * 0.7) * 30 * (1 - nimittaStr * 0.5);
+        // CLOUDS - Parikamma Nimitta: Diffuse grey clouds across the entire visual field
+        // NOT a centered ball - appears everywhere like fog/mist
+        if (nimittaType === 'clouds') {
+            // Multiple cloud layers drifting across the field
+            const numClouds = 12;
             
-            const grad = this.ctx.createRadialGradient(wobbleX, wobbleY, 0, 0, 0, size);
-            grad.addColorStop(0, `rgba(150, 150, 150, ${nimittaStr * 0.6})`);
-            grad.addColorStop(1, 'rgba(0,0,0,0)');
+            for (let c = 0; c < numClouds; c++) {
+                // Each cloud has its own slow drift pattern
+                const seed = c * 137.5; // Golden angle for distribution
+                const driftX = Math.sin(time * 0.05 + seed) * this.width * 0.6 + 
+                              Math.cos(time * 0.03 + seed * 0.7) * this.width * 0.3;
+                const driftY = Math.cos(time * 0.04 + seed * 1.3) * this.height * 0.5 +
+                              Math.sin(time * 0.02 + seed * 0.5) * this.height * 0.3;
+                
+                // Cloud size varies
+                const cloudSize = 150 + Math.sin(time * 0.1 + c) * 80 + (c % 3) * 60;
+                
+                // Clouds are grey, slightly varying in tone
+                const greyBase = 80 + (c % 4) * 15;
+                const alpha = nimittaStr * (0.15 + Math.sin(time * 0.2 + c * 0.5) * 0.05);
+                
+                const grad = this.ctx.createRadialGradient(driftX, driftY, 0, driftX, driftY, cloudSize);
+                grad.addColorStop(0, `rgba(${greyBase + 20}, ${greyBase + 15}, ${greyBase + 25}, ${alpha})`);
+                grad.addColorStop(0.4, `rgba(${greyBase}, ${greyBase - 5}, ${greyBase + 10}, ${alpha * 0.6})`);
+                grad.addColorStop(1, 'rgba(0,0,0,0)');
+                
+                this.ctx.fillStyle = grad;
+                this.ctx.fillRect(-this.cx, -this.cy, this.width, this.height);
+            }
             
-            this.ctx.fillStyle = grad;
-            this.ctx.beginPath();
-            this.ctx.arc(wobbleX, wobbleY, size, 0, Math.PI*2);
-            this.ctx.fill();
-        } 
+            // Add some wisps that move more randomly (instability of parikamma)
+            for (let w = 0; w < 5; w++) {
+                const wispX = Math.sin(time * 0.3 + w * 3) * this.width * 0.4 + 
+                             Math.cos(time * 0.7 + w * 2) * this.width * 0.2;
+                const wispY = Math.cos(time * 0.25 + w * 2.5) * this.height * 0.35 +
+                             Math.sin(time * 0.5 + w * 1.5) * this.height * 0.2;
+                const wispSize = 80 + Math.random() * 40;
+                
+                const grad = this.ctx.createRadialGradient(wispX, wispY, 0, wispX, wispY, wispSize);
+                grad.addColorStop(0, `rgba(120, 115, 130, ${nimittaStr * 0.12})`);
+                grad.addColorStop(1, 'rgba(0,0,0,0)');
+                
+                this.ctx.fillStyle = grad;
+                this.ctx.fillRect(-this.cx, -this.cy, this.width, this.height);
+            }
+        }
+        // COTTON - Uggaha Nimitta: NOW it starts to coalesce into a more defined form
         else if (nimittaType === 'cotton') {
-            // Blend from smoke appearance to cotton
+            // Still has some diffuse background but now there's a center forming
             const stability = nimittaStr;
-            const wobbleX = Math.sin(this.state.time) * 10 * (1 - stability);
-            const wobbleY = Math.cos(this.state.time * 0.7) * 10 * (1 - stability);
-
-            const brightness = 200 + (40 * stability);
-            const grad = this.ctx.createRadialGradient(wobbleX, wobbleY, 0, wobbleX, wobbleY, size*0.8);
-            grad.addColorStop(0, `rgba(${brightness}, ${brightness}, ${brightness}, ${nimittaStr})`);
-            grad.addColorStop(0.8, `rgba(${brightness-40}, ${brightness-40}, ${brightness-40}, ${nimittaStr * 0.8})`);
+            
+            // Diffuse background clouds (fading as it solidifies)
+            const bgAlpha = nimittaStr * 0.1 * (1 - stability * 0.5);
+            for (let c = 0; c < 6; c++) {
+                const driftX = Math.sin(time * 0.03 + c * 2) * this.width * 0.3;
+                const driftY = Math.cos(time * 0.025 + c * 2.5) * this.height * 0.3;
+                
+                const grad = this.ctx.createRadialGradient(driftX, driftY, 0, driftX, driftY, 200);
+                grad.addColorStop(0, `rgba(150, 145, 155, ${bgAlpha})`);
+                grad.addColorStop(1, 'rgba(0,0,0,0)');
+                
+                this.ctx.fillStyle = grad;
+                this.ctx.fillRect(-this.cx, -this.cy, this.width, this.height);
+            }
+            
+            // The coalescing center - becoming more defined
+            const wobbleX = Math.sin(time * 0.2) * 15 * (1 - stability);
+            const wobbleY = Math.cos(time * 0.15) * 15 * (1 - stability);
+            const size = 120 * (0.5 + stability * 0.5);
+            
+            const brightness = 180 + (60 * stability);
+            const grad = this.ctx.createRadialGradient(wobbleX, wobbleY, 0, wobbleX, wobbleY, size);
+            grad.addColorStop(0, `rgba(${brightness}, ${brightness - 5}, ${brightness + 5}, ${nimittaStr * 0.9})`);
+            grad.addColorStop(0.6, `rgba(${brightness - 30}, ${brightness - 35}, ${brightness - 25}, ${nimittaStr * 0.5})`);
             grad.addColorStop(1, 'rgba(0,0,0,0)');
             
             this.ctx.fillStyle = grad;
             this.ctx.beginPath();
-            this.ctx.arc(wobbleX, wobbleY, size*0.8, 0, Math.PI*2);
+            this.ctx.arc(wobbleX, wobbleY, size, 0, Math.PI * 2);
             this.ctx.fill();
-
-            // Texture (grain)
-            if (stability > 0.5) {
-                this.ctx.fillStyle = `rgba(0,0,0,${0.05 * stability})`;
-                for(let k=0; k<50; k++) {
-                    const r = Math.random() * size * 0.6;
-                    const a = Math.random() * Math.PI * 2;
+            
+            // Cotton-like texture (soft, fluffy edges)
+            if (stability > 0.3) {
+                for (let k = 0; k < 20; k++) {
+                    const angle = (k / 20) * Math.PI * 2 + time * 0.05;
+                    const dist = size * (0.5 + Math.sin(time * 0.3 + k) * 0.2);
+                    const blobX = wobbleX + Math.cos(angle) * dist;
+                    const blobY = wobbleY + Math.sin(angle) * dist;
+                    const blobSize = 30 + Math.sin(k * 0.5) * 15;
+                    
+                    const blobGrad = this.ctx.createRadialGradient(blobX, blobY, 0, blobX, blobY, blobSize);
+                    blobGrad.addColorStop(0, `rgba(${brightness - 10}, ${brightness - 15}, ${brightness - 5}, ${nimittaStr * 0.4 * stability})`);
+                    blobGrad.addColorStop(1, 'rgba(0,0,0,0)');
+                    
+                    this.ctx.fillStyle = blobGrad;
                     this.ctx.beginPath();
-                    this.ctx.arc(wobbleX + Math.cos(a)*r, wobbleY + Math.sin(a)*r, Math.random()*10, 0, Math.PI*2);
+                    this.ctx.arc(blobX, blobY, blobSize, 0, Math.PI * 2);
                     this.ctx.fill();
                 }
             }
         } 
+        // CRYSTAL - Patibhaga Nimitta: Clear, radiant, like a jewel or morning star
         else if (nimittaType === 'crystal') {
             this.ctx.globalCompositeOperation = 'screen';
             
@@ -510,28 +633,28 @@ export class PaAukEngine {
             
             this.ctx.fillStyle = glow;
             this.ctx.beginPath();
-            this.ctx.arc(0, 0, glowSize, 0, Math.PI*2);
+            this.ctx.arc(0, 0, glowSize, 0, Math.PI * 2);
             this.ctx.fill();
 
-            // Core
+            // Core - brilliant and clear
             const coreSize = 40 + (20 * nimittaStr);
             this.ctx.shadowBlur = 40 * nimittaStr;
             this.ctx.shadowColor = '#fff';
             this.ctx.fillStyle = '#fff';
             this.ctx.beginPath();
-            this.ctx.arc(0, 0, coreSize, 0, Math.PI*2);
+            this.ctx.arc(0, 0, coreSize, 0, Math.PI * 2);
             this.ctx.fill();
             this.ctx.shadowBlur = 0;
             
-            // Rays
+            // Rays emanating
             if (nimittaStr > 0.5) {
                 this.ctx.strokeStyle = `rgba(255,255,255,${0.5 * nimittaStr})`;
                 this.ctx.lineWidth = 2;
                 this.ctx.beginPath();
-                for(let i=0; i<6; i++) {
-                    const ang = (i * Math.PI/3) + (this.state.time * 0.05);
-                    this.ctx.moveTo(Math.cos(ang)*coreSize, Math.sin(ang)*coreSize);
-                    this.ctx.lineTo(Math.cos(ang)*(coreSize + 140 * nimittaStr), Math.sin(ang)*(coreSize + 140 * nimittaStr));
+                for (let i = 0; i < 6; i++) {
+                    const ang = (i * Math.PI / 3) + (time * 0.05);
+                    this.ctx.moveTo(Math.cos(ang) * coreSize, Math.sin(ang) * coreSize);
+                    this.ctx.lineTo(Math.cos(ang) * (coreSize + 140 * nimittaStr), Math.sin(ang) * (coreSize + 140 * nimittaStr));
                 }
                 this.ctx.stroke();
             }

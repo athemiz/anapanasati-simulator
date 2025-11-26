@@ -19,8 +19,8 @@ export const STAGES = [
         desc: "Focus on the touching point (Upper Lip). The mind is chaotic ('Monkey Mind'). Count the breaths to anchor attention.",
         factors: ['f-vitakka'], // Applied Thought
         mode: 'SAMATHA_BREATH',
-        params: { noise: 0.30, focus: 0.1, nimittaStr: 0.0, nimittaType: 'none', breathVis: 1.0 },
-        durationMinutes: 45 // Early meditation, settling the mind
+        params: { noise: 0.8, focus: 0.1, nimittaStr: 0.0, nimittaType: 'none', breathVis: 1.0 },
+        durationMinutes: 30 // Early meditation, settling the mind
     },
     {
         id: 1,
@@ -30,7 +30,7 @@ export const STAGES = [
         desc: "Drop the counting. Follow the continuous flow of breath at the touching point. The noise subsides.",
         factors: ['f-vitakka', 'f-vicara'], // Applied + Sustained
         mode: 'SAMATHA_BREATH',
-        params: { noise: 0.10, focus: 0.4, nimittaStr: 0.0, nimittaType: 'none', breathVis: 0.8 },
+        params: { noise: 0.3, focus: 0.4, nimittaStr: 0.0, nimittaType: 'none', breathVis: 0.8 },
         durationMinutes: 35 // Deepening concentration
     },
     {
@@ -38,10 +38,10 @@ export const STAGES = [
         category: "Samatha: Nimitta",
         title: "3. Preparatory Sign",
         pali: "Parikamma-Nimitta",
-        desc: "A grey, smoky, or misty form appears. It is unstable and wanders. Do not chase it; keep focus on the breath.",
+        desc: "A grey, smoky, or misty form appears diffusely across the visual field. It is unstable and wanders. Do not chase it; keep focus on the breath.",
         factors: ['f-vitakka', 'f-vicara'],
         mode: 'SAMATHA_NIMITTA',
-        params: { noise: 0.05, focus: 0.6, nimittaStr: 0.4, nimittaType: 'smoke', breathVis: 0.6 },
+        params: { noise: 0.15, focus: 0.6, nimittaStr: 0.4, nimittaType: 'clouds', breathVis: 0.6 },
         durationMinutes: 25 // Sign appears and develops
     },
     {
