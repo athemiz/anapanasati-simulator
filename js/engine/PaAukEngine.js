@@ -455,6 +455,23 @@ export class PaAukEngine {
     }
 
     renderBlended(prevStage, nextStage, params, blend) {
+        // Special case: SAMATHA_BREATH to SAMATHA_NIMITTA transition
+        // These share the same visual field base, so don't double-render
+        // Instead, just render with interpolated params
+        if (prevStage.mode === 'SAMATHA_BREATH' && nextStage.mode === 'SAMATHA_NIMITTA') {
+            // Render the nimitta stage with blended params - it includes the base visual field
+            this.renderStage(nextStage, params);
+            return;
+        }
+        
+        // Special case: SAMATHA_NIMITTA to SAMATHA_NIMITTA (between nimitta types)
+        // Just use interpolated params, no alpha blending needed
+        if (prevStage.mode === 'SAMATHA_NIMITTA' && nextStage.mode === 'SAMATHA_NIMITTA') {
+            this.renderStage(nextStage, params);
+            return;
+        }
+
+        // For other transitions, use alpha blending
         const fadeOut = 1 - blend;
         const fadeIn = blend;
 
@@ -625,6 +642,7 @@ export class PaAukEngine {
 
     // --- RENDERER 2: NIMITTA ---
     // Key: The visual field maintains continuity - nimitta forms ON TOP of existing field
+    // Each stage shows elements from previous stage fading out for smooth transitions
     renderNimitta(p) {
         const noise = p.noise !== undefined ? p.noise : 0;
         const greyEmergence = p.greyEmergence !== undefined ? p.greyEmergence : 0.5;
@@ -633,9 +651,8 @@ export class PaAukEngine {
         const time = this.state.time;
 
         // LAYER 1: Continue rendering the base visual field (maintains continuity)
-        // This is similar to the breath renderer's background
         this.ctx.globalCompositeOperation = 'lighter';
-        this.ctx.globalAlpha = 0.3 * (1 - nimittaStr * 0.3); // Fade slightly as nimitta strengthens
+        this.ctx.globalAlpha = 0.25 * (1 - nimittaStr * 0.4);
         
         const offsetX = (time * 8) % 256;
         const offsetY = (time * 6) % 256;
@@ -648,66 +665,68 @@ export class PaAukEngine {
         this.ctx.globalAlpha = 1;
         this.ctx.globalCompositeOperation = 'source-over';
 
-        // LAYER 2: Grey/smoky wisps (continuing from breath stage)
-        for (let i = 0; i < 15; i++) {
-            const wisp = this.wisps[i];
-            const wx = wisp.x * this.cx;
-            const wy = wisp.y * this.cy;
-            const wSize = wisp.size * 0.8;
-            
-            const grad = this.ctx.createRadialGradient(wx, wy, 0, wx, wy, wSize);
-            // Mostly grey now (high greyEmergence)
-            const greyVal = 50 + Math.sin(time * 0.2 + i) * 15;
-            const alpha = 0.15 * (1 - nimittaStr * 0.4);
-            grad.addColorStop(0, `rgba(${greyVal + 20}, ${greyVal + 15}, ${greyVal + 25}, ${alpha})`);
-            grad.addColorStop(1, 'rgba(0,0,0,0)');
-            
-            this.ctx.fillStyle = grad;
-            this.ctx.fillRect(-this.cx, -this.cy, this.width, this.height);
+        // LAYER 2: Grey/smoky wisps (fade as nimitta strengthens)
+        const wispFade = Math.max(0, 1 - nimittaStr * 0.6);
+        if (wispFade > 0.05) {
+            for (let i = 0; i < 12; i++) {
+                const wisp = this.wisps[i];
+                const wx = wisp.x * this.cx;
+                const wy = wisp.y * this.cy;
+                const wSize = wisp.size * 0.7;
+                
+                const grad = this.ctx.createRadialGradient(wx, wy, 0, wx, wy, wSize);
+                const greyVal = 50 + Math.sin(time * 0.2 + i) * 15;
+                const alpha = 0.12 * wispFade;
+                grad.addColorStop(0, `rgba(${greyVal + 20}, ${greyVal + 15}, ${greyVal + 25}, ${alpha})`);
+                grad.addColorStop(1, 'rgba(0,0,0,0)');
+                
+                this.ctx.fillStyle = grad;
+                this.ctx.fillRect(-this.cx, -this.cy, this.width, this.height);
+            }
         }
 
-        // CLOUDS - Parikamma: White/grey mist forming across the field
+        // CLOUDS - Parikamma: White mist forming across the field
         if (nimittaType === 'clouds') {
-            // White misty clouds forming (not replacing the field, adding to it)
-            for (let c = 0; c < 12; c++) {
+            // White misty clouds - MORE INTENSE
+            for (let c = 0; c < 15; c++) {
                 const seed = c * 137.5;
-                const driftX = Math.sin(time * 0.04 + seed) * this.cx * 0.6 + 
-                              Math.cos(time * 0.025 + seed * 0.7) * this.cx * 0.35;
-                const driftY = Math.cos(time * 0.035 + seed * 1.3) * this.cy * 0.5 +
-                              Math.sin(time * 0.018 + seed * 0.5) * this.cy * 0.3;
+                const driftX = Math.sin(time * 0.04 + seed) * this.cx * 0.65 + 
+                              Math.cos(time * 0.025 + seed * 0.7) * this.cx * 0.4;
+                const driftY = Math.cos(time * 0.035 + seed * 1.3) * this.cy * 0.55 +
+                              Math.sin(time * 0.018 + seed * 0.5) * this.cy * 0.35;
                 
-                const cloudSize = 100 + Math.sin(time * 0.08 + c) * 50 + (c % 3) * 40;
-                // Whiter clouds (not grey) - like white mist
-                const whiteBase = 140 + (c % 4) * 20;
-                const alpha = nimittaStr * (0.12 + Math.sin(time * 0.15 + c * 0.5) * 0.04);
+                const cloudSize = 110 + Math.sin(time * 0.08 + c) * 55 + (c % 3) * 45;
+                const whiteBase = 160 + (c % 4) * 20;
+                // Increased alpha for more smokiness
+                const alpha = nimittaStr * (0.2 + Math.sin(time * 0.15 + c * 0.5) * 0.06);
                 
                 const grad = this.ctx.createRadialGradient(driftX, driftY, 0, driftX, driftY, cloudSize);
-                grad.addColorStop(0, `rgba(${whiteBase + 30}, ${whiteBase + 25}, ${whiteBase + 35}, ${alpha})`);
-                grad.addColorStop(0.4, `rgba(${whiteBase}, ${whiteBase - 5}, ${whiteBase + 10}, ${alpha * 0.6})`);
+                grad.addColorStop(0, `rgba(${whiteBase + 40}, ${whiteBase + 35}, ${whiteBase + 45}, ${alpha})`);
+                grad.addColorStop(0.35, `rgba(${whiteBase + 10}, ${whiteBase + 5}, ${whiteBase + 15}, ${alpha * 0.7})`);
+                grad.addColorStop(0.7, `rgba(${whiteBase - 20}, ${whiteBase - 25}, ${whiteBase - 15}, ${alpha * 0.3})`);
                 grad.addColorStop(1, 'rgba(0,0,0,0)');
                 
                 this.ctx.fillStyle = grad;
                 this.ctx.fillRect(-this.cx, -this.cy, this.width, this.height);
             }
             
-            // White shiny spots / sparkles within the mist
-            for (let s = 0; s < 20; s++) {
-                // Spots appear and fade based on time
-                const spotPhase = (time * 0.3 + s * 0.5) % 3;
-                if (spotPhase > 1) continue; // Only show part of the time
+            // White shiny spots / sparkles
+            for (let s = 0; s < 25; s++) {
+                const spotPhase = (time * 0.35 + s * 0.45) % 2.5;
+                if (spotPhase > 1.2) continue;
                 
-                const spotAlpha = Math.sin(spotPhase * Math.PI) * nimittaStr * 0.6;
+                const spotAlpha = Math.sin(spotPhase * Math.PI / 1.2) * nimittaStr * 0.7;
                 if (spotAlpha < 0.05) continue;
                 
                 const spotX = Math.sin(time * 0.1 + s * 2.3) * this.cx * 0.7 +
-                             Math.cos(time * 0.07 + s * 1.7) * this.cx * 0.3;
+                             Math.cos(time * 0.07 + s * 1.7) * this.cx * 0.35;
                 const spotY = Math.cos(time * 0.08 + s * 1.9) * this.cy * 0.6 +
-                             Math.sin(time * 0.05 + s * 2.1) * this.cy * 0.3;
-                const spotSize = 8 + Math.sin(s * 0.7) * 6;
+                             Math.sin(time * 0.05 + s * 2.1) * this.cy * 0.35;
+                const spotSize = 10 + Math.sin(s * 0.7) * 7;
                 
                 const spotGrad = this.ctx.createRadialGradient(spotX, spotY, 0, spotX, spotY, spotSize);
                 spotGrad.addColorStop(0, `rgba(255, 255, 255, ${spotAlpha})`);
-                spotGrad.addColorStop(0.5, `rgba(220, 225, 235, ${spotAlpha * 0.5})`);
+                spotGrad.addColorStop(0.4, `rgba(230, 235, 245, ${spotAlpha * 0.6})`);
                 spotGrad.addColorStop(1, 'rgba(0,0,0,0)');
                 
                 this.ctx.fillStyle = spotGrad;
@@ -716,125 +735,166 @@ export class PaAukEngine {
                 this.ctx.fill();
             }
         }
-        // COTTON - Uggaha: Clouds coalescing into a defined white form
+        // COTTON - Uggaha: Wild clouds slowly fade while center coalesces
         else if (nimittaType === 'cotton') {
-            // First, render diffuse clouds (like parikamma but starting to gather)
-            // These clouds gradually move toward center as nimittaStr increases
-            for (let c = 0; c < 10; c++) {
-                const seed = c * 137.5;
-                // Clouds drift toward center as strength increases
-                const gatherFactor = nimittaStr * 0.6;
-                const baseX = Math.sin(time * 0.04 + seed) * this.cx * 0.5;
-                const baseY = Math.cos(time * 0.035 + seed * 1.3) * this.cy * 0.4;
-                const driftX = baseX * (1 - gatherFactor);
-                const driftY = baseY * (1 - gatherFactor);
-                
-                const cloudSize = 80 + Math.sin(time * 0.08 + c) * 40;
-                const whiteBase = 160 + (c % 4) * 15;
-                const alpha = 0.15 * (1 - nimittaStr * 0.3);
-                
-                const grad = this.ctx.createRadialGradient(driftX, driftY, 0, driftX, driftY, cloudSize);
-                grad.addColorStop(0, `rgba(${whiteBase}, ${whiteBase - 5}, ${whiteBase + 5}, ${alpha})`);
-                grad.addColorStop(1, 'rgba(0,0,0,0)');
-                
-                this.ctx.fillStyle = grad;
-                this.ctx.fillRect(-this.cx, -this.cy, this.width, this.height);
+            // WILD CLOUDS - still present but fading and gathering toward center
+            // This creates continuity from Parikamma
+            const cloudFade = Math.max(0, 1 - nimittaStr * 0.8); // Clouds fade as center strengthens
+            
+            if (cloudFade > 0.05) {
+                for (let c = 0; c < 12; c++) {
+                    const seed = c * 137.5;
+                    // Clouds slowly drift toward center
+                    const gatherFactor = nimittaStr * 0.5;
+                    const baseX = Math.sin(time * 0.04 + seed) * this.cx * 0.6;
+                    const baseY = Math.cos(time * 0.035 + seed * 1.3) * this.cy * 0.5;
+                    const driftX = baseX * (1 - gatherFactor);
+                    const driftY = baseY * (1 - gatherFactor);
+                    
+                    const cloudSize = 100 + Math.sin(time * 0.08 + c) * 50;
+                    const whiteBase = 155 + (c % 4) * 18;
+                    const alpha = 0.18 * cloudFade;
+                    
+                    const grad = this.ctx.createRadialGradient(driftX, driftY, 0, driftX, driftY, cloudSize);
+                    grad.addColorStop(0, `rgba(${whiteBase + 30}, ${whiteBase + 25}, ${whiteBase + 35}, ${alpha})`);
+                    grad.addColorStop(0.5, `rgba(${whiteBase}, ${whiteBase - 5}, ${whiteBase + 5}, ${alpha * 0.5})`);
+                    grad.addColorStop(1, 'rgba(0,0,0,0)');
+                    
+                    this.ctx.fillStyle = grad;
+                    this.ctx.fillRect(-this.cx, -this.cy, this.width, this.height);
+                }
             }
             
-            // Shiny spots (continuing from parikamma, also gathering)
-            for (let s = 0; s < 15; s++) {
-                const spotPhase = (time * 0.25 + s * 0.6) % 2.5;
-                if (spotPhase > 1) continue;
-                
-                const spotAlpha = Math.sin(spotPhase * Math.PI) * 0.5;
-                if (spotAlpha < 0.05) continue;
-                
-                // Spots also gather toward center
-                const gatherFactor = nimittaStr * 0.7;
-                const baseX = Math.sin(time * 0.1 + s * 2.3) * this.cx * 0.5;
-                const baseY = Math.cos(time * 0.08 + s * 1.9) * this.cy * 0.4;
-                const spotX = baseX * (1 - gatherFactor);
-                const spotY = baseY * (1 - gatherFactor);
-                const spotSize = 6 + Math.sin(s * 0.7) * 4;
-                
-                const spotGrad = this.ctx.createRadialGradient(spotX, spotY, 0, spotX, spotY, spotSize);
-                spotGrad.addColorStop(0, `rgba(255, 255, 255, ${spotAlpha})`);
-                spotGrad.addColorStop(1, 'rgba(0,0,0,0)');
-                
-                this.ctx.fillStyle = spotGrad;
-                this.ctx.beginPath();
-                this.ctx.arc(spotX, spotY, spotSize, 0, Math.PI * 2);
-                this.ctx.fill();
+            // Shiny spots - also gathering and fading
+            const spotFade = Math.max(0, 1 - nimittaStr * 0.6);
+            if (spotFade > 0.05) {
+                for (let s = 0; s < 18; s++) {
+                    const spotPhase = (time * 0.28 + s * 0.55) % 2.2;
+                    if (spotPhase > 1) continue;
+                    
+                    const spotAlpha = Math.sin(spotPhase * Math.PI) * 0.5 * spotFade;
+                    if (spotAlpha < 0.05) continue;
+                    
+                    const gatherFactor = nimittaStr * 0.6;
+                    const baseX = Math.sin(time * 0.1 + s * 2.3) * this.cx * 0.55;
+                    const baseY = Math.cos(time * 0.08 + s * 1.9) * this.cy * 0.45;
+                    const spotX = baseX * (1 - gatherFactor);
+                    const spotY = baseY * (1 - gatherFactor);
+                    const spotSize = 7 + Math.sin(s * 0.7) * 5;
+                    
+                    const spotGrad = this.ctx.createRadialGradient(spotX, spotY, 0, spotX, spotY, spotSize);
+                    spotGrad.addColorStop(0, `rgba(255, 255, 255, ${spotAlpha})`);
+                    spotGrad.addColorStop(1, 'rgba(0,0,0,0)');
+                    
+                    this.ctx.fillStyle = spotGrad;
+                    this.ctx.beginPath();
+                    this.ctx.arc(spotX, spotY, spotSize, 0, Math.PI * 2);
+                    this.ctx.fill();
+                }
             }
             
-            // The coalescing white center (cotton-like)
-            const wobbleX = Math.sin(time * 0.15) * 8 * (1 - nimittaStr);
-            const wobbleY = Math.cos(time * 0.12) * 8 * (1 - nimittaStr);
-            const coreSize = 60 + nimittaStr * 60;
+            // THE COALESCING CENTER - grows in as nimittaStr increases
+            const centerStrength = nimittaStr; // Center appears gradually
             
-            // Soft outer glow
-            const outerGrad = this.ctx.createRadialGradient(wobbleX, wobbleY, 0, wobbleX, wobbleY, coreSize * 1.8);
-            outerGrad.addColorStop(0, `rgba(230, 230, 235, ${nimittaStr * 0.7})`);
-            outerGrad.addColorStop(0.5, `rgba(200, 200, 210, ${nimittaStr * 0.4})`);
-            outerGrad.addColorStop(1, 'rgba(0,0,0,0)');
-            
-            this.ctx.fillStyle = outerGrad;
-            this.ctx.beginPath();
-            this.ctx.arc(wobbleX, wobbleY, coreSize * 1.8, 0, Math.PI * 2);
-            this.ctx.fill();
-            
-            // Dense white center
-            const coreGrad = this.ctx.createRadialGradient(wobbleX, wobbleY, 0, wobbleX, wobbleY, coreSize);
-            coreGrad.addColorStop(0, `rgba(250, 250, 255, ${nimittaStr * 0.9})`);
-            coreGrad.addColorStop(0.6, `rgba(220, 220, 230, ${nimittaStr * 0.6})`);
-            coreGrad.addColorStop(1, 'rgba(180, 180, 190, 0)');
-            
-            this.ctx.fillStyle = coreGrad;
-            this.ctx.beginPath();
-            this.ctx.arc(wobbleX, wobbleY, coreSize, 0, Math.PI * 2);
-            this.ctx.fill();
-            
-            // Cotton-like fluffy edges
-            for (let k = 0; k < 12; k++) {
-                const angle = (k / 12) * Math.PI * 2 + time * 0.03;
-                const dist = coreSize * (0.7 + Math.sin(time * 0.2 + k) * 0.15);
-                const blobX = wobbleX + Math.cos(angle) * dist;
-                const blobY = wobbleY + Math.sin(angle) * dist;
-                const blobSize = 20 + Math.sin(k * 0.5 + time * 0.1) * 10;
+            if (centerStrength > 0.1) {
+                const wobbleX = Math.sin(time * 0.15) * 6 * (1 - centerStrength);
+                const wobbleY = Math.cos(time * 0.12) * 6 * (1 - centerStrength);
+                const coreSize = 50 + centerStrength * 70;
                 
-                const blobGrad = this.ctx.createRadialGradient(blobX, blobY, 0, blobX, blobY, blobSize);
-                blobGrad.addColorStop(0, `rgba(245, 245, 250, ${nimittaStr * 0.5})`);
-                blobGrad.addColorStop(1, 'rgba(0,0,0,0)');
+                // Soft outer glow - appears first
+                const outerGrad = this.ctx.createRadialGradient(wobbleX, wobbleY, 0, wobbleX, wobbleY, coreSize * 2);
+                outerGrad.addColorStop(0, `rgba(235, 235, 240, ${centerStrength * 0.6})`);
+                outerGrad.addColorStop(0.4, `rgba(210, 210, 220, ${centerStrength * 0.35})`);
+                outerGrad.addColorStop(0.7, `rgba(180, 180, 195, ${centerStrength * 0.15})`);
+                outerGrad.addColorStop(1, 'rgba(0,0,0,0)');
                 
-                this.ctx.fillStyle = blobGrad;
+                this.ctx.fillStyle = outerGrad;
                 this.ctx.beginPath();
-                this.ctx.arc(blobX, blobY, blobSize, 0, Math.PI * 2);
+                this.ctx.arc(wobbleX, wobbleY, coreSize * 2, 0, Math.PI * 2);
                 this.ctx.fill();
+                
+                // Dense white center - appears as strength builds
+                if (centerStrength > 0.3) {
+                    const innerStrength = (centerStrength - 0.3) / 0.7; // 0-1 for center
+                    const coreGrad = this.ctx.createRadialGradient(wobbleX, wobbleY, 0, wobbleX, wobbleY, coreSize);
+                    coreGrad.addColorStop(0, `rgba(252, 252, 255, ${innerStrength * 0.9})`);
+                    coreGrad.addColorStop(0.5, `rgba(230, 230, 240, ${innerStrength * 0.6})`);
+                    coreGrad.addColorStop(1, 'rgba(200, 200, 215, 0)');
+                    
+                    this.ctx.fillStyle = coreGrad;
+                    this.ctx.beginPath();
+                    this.ctx.arc(wobbleX, wobbleY, coreSize, 0, Math.PI * 2);
+                    this.ctx.fill();
+                }
+                
+                // Cotton-like fluffy edges
+                if (centerStrength > 0.4) {
+                    const fluffStrength = (centerStrength - 0.4) / 0.6;
+                    for (let k = 0; k < 10; k++) {
+                        const angle = (k / 10) * Math.PI * 2 + time * 0.025;
+                        const dist = coreSize * (0.65 + Math.sin(time * 0.18 + k) * 0.12);
+                        const blobX = wobbleX + Math.cos(angle) * dist;
+                        const blobY = wobbleY + Math.sin(angle) * dist;
+                        const blobSize = 18 + Math.sin(k * 0.5 + time * 0.1) * 8;
+                        
+                        const blobGrad = this.ctx.createRadialGradient(blobX, blobY, 0, blobX, blobY, blobSize);
+                        blobGrad.addColorStop(0, `rgba(248, 248, 252, ${fluffStrength * 0.45})`);
+                        blobGrad.addColorStop(1, 'rgba(0,0,0,0)');
+                        
+                        this.ctx.fillStyle = blobGrad;
+                        this.ctx.beginPath();
+                        this.ctx.arc(blobX, blobY, blobSize, 0, Math.PI * 2);
+                        this.ctx.fill();
+                    }
+                }
             }
         }
-        // CRYSTAL - Patibhaga: Radiant transparent light
+        // CRYSTAL - Patibhaga: Cotton form gradually becomes radiant
         else if (nimittaType === 'crystal') {
-            // Some remaining background wisps (very faint)
-            for (let c = 0; c < 5; c++) {
-                const driftX = Math.sin(time * 0.03 + c * 2) * this.cx * 0.3;
-                const driftY = Math.cos(time * 0.025 + c * 2.5) * this.cy * 0.3;
+            // REMNANTS OF COTTON - fading out as crystal emerges
+            const cottonFade = Math.max(0, 1 - nimittaStr * 0.7);
+            
+            if (cottonFade > 0.1) {
+                // Fading cotton center
+                const cottonGrad = this.ctx.createRadialGradient(0, 0, 0, 0, 0, 100);
+                cottonGrad.addColorStop(0, `rgba(240, 240, 245, ${cottonFade * 0.5})`);
+                cottonGrad.addColorStop(0.6, `rgba(210, 210, 220, ${cottonFade * 0.25})`);
+                cottonGrad.addColorStop(1, 'rgba(0,0,0,0)');
                 
-                const grad = this.ctx.createRadialGradient(driftX, driftY, 0, driftX, driftY, 100);
-                grad.addColorStop(0, `rgba(180, 180, 190, ${0.08 * (1 - nimittaStr * 0.5)})`);
-                grad.addColorStop(1, 'rgba(0,0,0,0)');
+                this.ctx.fillStyle = cottonGrad;
+                this.ctx.beginPath();
+                this.ctx.arc(0, 0, 100, 0, Math.PI * 2);
+                this.ctx.fill();
                 
-                this.ctx.fillStyle = grad;
-                this.ctx.fillRect(-this.cx, -this.cy, this.width, this.height);
+                // Fading cotton fluffs
+                for (let k = 0; k < 8; k++) {
+                    const angle = (k / 8) * Math.PI * 2 + time * 0.02;
+                    const dist = 70 + Math.sin(time * 0.15 + k) * 10;
+                    const blobX = Math.cos(angle) * dist;
+                    const blobY = Math.sin(angle) * dist;
+                    
+                    const blobGrad = this.ctx.createRadialGradient(blobX, blobY, 0, blobX, blobY, 20);
+                    blobGrad.addColorStop(0, `rgba(235, 235, 242, ${cottonFade * 0.3})`);
+                    blobGrad.addColorStop(1, 'rgba(0,0,0,0)');
+                    
+                    this.ctx.fillStyle = blobGrad;
+                    this.ctx.beginPath();
+                    this.ctx.arc(blobX, blobY, 20, 0, Math.PI * 2);
+                    this.ctx.fill();
+                }
             }
             
+            // CRYSTAL LIGHT - emerging and growing
             this.ctx.globalCompositeOperation = 'screen';
             
-            // Brilliant outer glow
-            const glowSize = 120 + (130 * nimittaStr);
-            const glow = this.ctx.createRadialGradient(0, 0, 20, 0, 0, glowSize);
-            glow.addColorStop(0, `rgba(255,255,255,${0.9 * nimittaStr})`);
-            glow.addColorStop(0.3, `rgba(230,240,255,${0.5 * nimittaStr})`);
-            glow.addColorStop(0.6, `rgba(200,220,255,${0.25 * nimittaStr})`);
+            const crystalStrength = nimittaStr;
+            
+            // Outer radiant glow
+            const glowSize = 100 + (150 * crystalStrength);
+            const glow = this.ctx.createRadialGradient(0, 0, 15, 0, 0, glowSize);
+            glow.addColorStop(0, `rgba(255,255,255,${0.85 * crystalStrength})`);
+            glow.addColorStop(0.25, `rgba(240,248,255,${0.55 * crystalStrength})`);
+            glow.addColorStop(0.5, `rgba(220,235,255,${0.3 * crystalStrength})`);
             glow.addColorStop(1, 'rgba(0,0,0,0)');
             
             this.ctx.fillStyle = glow;
@@ -843,24 +903,29 @@ export class PaAukEngine {
             this.ctx.fill();
 
             // Brilliant core
-            const coreSize = 35 + (25 * nimittaStr);
-            this.ctx.shadowBlur = 60 * nimittaStr;
-            this.ctx.shadowColor = '#fff';
-            this.ctx.fillStyle = '#fff';
-            this.ctx.beginPath();
-            this.ctx.arc(0, 0, coreSize, 0, Math.PI * 2);
-            this.ctx.fill();
-            this.ctx.shadowBlur = 0;
+            if (crystalStrength > 0.3) {
+                const coreStrength = (crystalStrength - 0.3) / 0.7;
+                const coreSize = 30 + (30 * coreStrength);
+                this.ctx.shadowBlur = 50 * coreStrength;
+                this.ctx.shadowColor = '#fff';
+                this.ctx.fillStyle = `rgba(255,255,255,${coreStrength})`;
+                this.ctx.beginPath();
+                this.ctx.arc(0, 0, coreSize, 0, Math.PI * 2);
+                this.ctx.fill();
+                this.ctx.shadowBlur = 0;
+            }
             
             // Radiating rays
-            if (nimittaStr > 0.4) {
-                this.ctx.strokeStyle = `rgba(255,255,255,${0.6 * nimittaStr})`;
+            if (crystalStrength > 0.5) {
+                const rayStrength = (crystalStrength - 0.5) / 0.5;
+                this.ctx.strokeStyle = `rgba(255,255,255,${0.5 * rayStrength})`;
                 this.ctx.lineWidth = 2;
                 this.ctx.beginPath();
+                const coreSize = 30 + (30 * crystalStrength);
                 for (let i = 0; i < 8; i++) {
                     const ang = (i * Math.PI / 4) + (time * 0.04);
                     this.ctx.moveTo(Math.cos(ang) * coreSize, Math.sin(ang) * coreSize);
-                    this.ctx.lineTo(Math.cos(ang) * (coreSize + 120 * nimittaStr), Math.sin(ang) * (coreSize + 120 * nimittaStr));
+                    this.ctx.lineTo(Math.cos(ang) * (coreSize + 100 * rayStrength), Math.sin(ang) * (coreSize + 100 * rayStrength));
                 }
                 this.ctx.stroke();
             }
