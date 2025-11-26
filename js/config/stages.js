@@ -30,7 +30,7 @@ export const STAGES = [
         desc: "Drop the counting. Follow the continuous flow of breath. The visual noise begins to transform - hints of grey smokiness emerge within the field.",
         factors: ['f-vitakka', 'f-vicara'], // Applied + Sustained
         mode: 'SAMATHA_BREATH',
-        params: { noise: 0.6, focus: 0.4, greyEmergence: 0.4, nimittaStr: 0.0, nimittaType: 'none', breathVis: 0.8 },
+        params: { noise: 0.55, focus: 0.4, greyEmergence: 0.5, nimittaStr: 0.0, nimittaType: 'none', breathVis: 0.8 },
         durationMinutes: 35 // Deepening concentration
     },
     {
@@ -41,7 +41,7 @@ export const STAGES = [
         desc: "White misty clouds form across the visual field with shiny spots. They are unstable and wander. Do not chase them; keep focus on the breath.",
         factors: ['f-vitakka', 'f-vicara'],
         mode: 'SAMATHA_NIMITTA',
-        params: { noise: 0.5, focus: 0.6, greyEmergence: 0.7, nimittaStr: 0.5, nimittaType: 'clouds', breathVis: 0.6 },
+        params: { noise: 0.5, focus: 0.6, greyEmergence: 0.6, nimittaStr: 0.3, nimittaType: 'clouds', breathVis: 0.6 },
         durationMinutes: 25 // Sign appears and develops
     },
     {
@@ -52,7 +52,7 @@ export const STAGES = [
         desc: "The clouds coalesce into a white, opaque form (like cotton or a pearl). It becomes stable and defined.",
         factors: ['f-vitakka', 'f-vicara', 'f-piti'], // Joy arises
         mode: 'SAMATHA_NIMITTA',
-        params: { noise: 0.2, focus: 0.8, greyEmergence: 0.5, nimittaStr: 0.85, nimittaType: 'cotton', breathVis: 0.4 },
+        params: { noise: 0.35, focus: 0.8, greyEmergence: 0.5, nimittaStr: 0.7, nimittaType: 'cotton', breathVis: 0.4 },
         durationMinutes: 30 // Stabilizing the sign
     },
     {
