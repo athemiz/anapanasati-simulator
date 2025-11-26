@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pa-Auk: The Visuddhimagga Path Simulator</title>
+    <link rel="stylesheet" href="styles/main.css">
+</head>
+<body>
+
+    <!-- START SCREEN -->
+    <div id="start-screen">
+        <div class="start-container">
+            <div class="start-header">
+                <div class="dharma-wheel">☸</div>
+                <h1 class="start-title">The Visuddhimagga Path</h1>
+                <p class="start-subtitle">Pa-Auk Sayadaw Meditation Simulator</p>
+            </div>
+
+            <div class="mode-selection">
+                <h2 class="mode-label">Select Simulation Mode</h2>
+                
+                <button class="mode-btn" id="mode-manual">
+                    <span class="mode-icon">⏸</span>
+                    <div class="mode-info">
+                        <span class="mode-name">Manual Mode</span>
+                        <span class="mode-desc">Navigate stages at your own pace using buttons</span>
+                    </div>
+                </button>
+
+                <button class="mode-btn" id="mode-realtime">
+                    <span class="mode-icon">▶</span>
+                    <div class="mode-info">
+                        <span class="mode-name">Real-Time Journey</span>
+                        <span class="mode-desc">Automatic progression with realistic timing (accelerated)</span>
+                    </div>
+                </button>
+            </div>
+
+            <div class="speed-selection" id="speed-selection" style="display: none;">
+                <h2 class="mode-label">Time Acceleration</h2>
+                <p class="speed-info">Total meditation time simulated: <span id="total-time-display">~8 hours</span></p>
+                
+                <div class="speed-buttons">
+                    <button class="speed-btn" data-speed="60">
+                        <span class="speed-value">60×</span>
+                        <span class="speed-label">~8 min</span>
+                    </button>
+                    <button class="speed-btn active" data-speed="120">
+                        <span class="speed-value">120×</span>
+                        <span class="speed-label">~4 min</span>
+                    </button>
+                    <button class="speed-btn" data-speed="240">
+                        <span class="speed-value">240×</span>
+                        <span class="speed-label">~2 min</span>
+                    </button>
+                    <button class="speed-btn" data-speed="480">
+                        <span class="speed-value">480×</span>
+                        <span class="speed-label">~1 min</span>
+                    </button>
+                </div>
+
+                <button class="start-btn" id="btn-start-realtime">
+                    Begin the Journey
+                </button>
+            </div>
+
+            <div class="start-footer">
+                <p>Based on the meditation system taught by Pa-Auk Sayadaw</p>
+                <p class="pali-quote">"Samādhi parisuddho pariyodāto"</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- MAIN SIMULATION -->
+    <div id="viewport" style="display: none;">
+        <canvas id="simCanvas"></canvas>
+        <div class="vignette" id="vignette"></div>
+        <div id="flash-overlay"></div>
+
+        <!-- MEDITATION TIMER (Real-time mode) -->
+        <div id="meditation-timer" class="meditation-timer" style="display: none;">
+            <div class="timer-label">Meditation Time</div>
+            <div class="timer-value" id="timer-value">0:00:00</div>
+            <div class="timer-speed" id="timer-speed">120× speed</div>
+        </div>
+
+        <!-- HUD -->
+        <div id="hud-container">
+            <div class="hud-top">
+                <div class="info-panel" id="info-panel">
+                    <span class="stage-category" id="stage-cat">Samatha Practice</span>
+                    <h1 class="stage-title" id="stage-title">1. Preparation</h1>
+                    <span class="pali-term" id="stage-pali">Ganana (Counting)</span>
+                    <div class="stage-desc" id="stage-desc">
+                        Focus your attention on the area below the nose (the touching point). 
+                        The mind is scattered, represented by visual noise. 
+                        Count the breaths (1 to 8) to tether the wandering mind.
+                    </div>
+                    <!-- Stage time remaining (real-time mode) -->
+                    <div class="stage-time" id="stage-time" style="display: none;">
+                        <span class="stage-time-label">Stage progress:</span>
+                        <div class="stage-time-bar">
+                            <div class="stage-time-fill" id="stage-time-fill"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="factors-display">
+                    <div class="factor-label">Jhana Factors</div>
+                    <div class="factor-rack">
+                        <div class="factor-chip" id="f-vitakka">Vitakka</div>
+                        <div class="factor-chip" id="f-vicara">Vicara</div>
+                        <div class="factor-chip" id="f-piti">Piti</div>
+                        <div class="factor-chip" id="f-sukha">Sukha</div>
+                        <div class="factor-chip" id="f-ekaggata">Ekaggata</div>
+                        <div class="factor-chip" id="f-upekkha">Upekkha</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="breath-monitor">
+                <div class="breath-bar-bg">
+                    <div class="breath-bar-val" id="breath-val"></div>
+                </div>
+                <span class="breath-label">Breath Amplitude</span>
+            </div>
+
+            <div class="hud-bottom">
+                <div class="progress-container">
+                    <div class="progress-fill" id="progress-fill"></div>
+                </div>
+                <div class="controls" id="manual-controls">
+                    <button id="btn-prev">Previous</button>
+                    <button id="btn-next">Next Stage</button>
+                </div>
+                <div class="controls realtime-controls" id="realtime-controls" style="display: none;">
+                    <button id="btn-pause">Pause</button>
+                    <button id="btn-exit">Exit</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script type="module" src="js/main.js"></script>
+</body>
+</html>
